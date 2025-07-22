@@ -1,4 +1,4 @@
-"use client"; // ✅ Ensure this is at the top
+"use client"; // 
 
 import Link from "next/link";
 

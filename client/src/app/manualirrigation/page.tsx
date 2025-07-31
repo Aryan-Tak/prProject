@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 
 export default function ManualIrrigationPage() {
   const [espIP, setEspIP] = useState('');
+  const [pumpIP, setPumpIP] = useState('192.168.248.100'); // <-- replace with your actual pump ESP IP
   const [connected, setConnected] = useState(false);
   const [motorStatus, setMotorStatus] = useState('unknown');
   const [error, setError] = useState('');
 
-  const ipCamURL = "https://192.168.248.254:8080/video"; // Use your IP Webcam URL here
+  const ipCamURL = "https://192.168.50.130:8080/video";
 
   const connectToESP = async (ip: string) => {
     setMotorStatus('unknown');
@@ -24,6 +25,17 @@ export default function ManualIrrigationPage() {
       await fetch(url);
     } catch (err) {
       console.error(`Failed to send command '${command}':`, err);
+    }
+  };
+
+  const sendPumpCommand = async (command: 'start' | 'stop') => {
+    const url = `http://${pumpIP}/${command}`;
+    console.log(`Sending pump command: ${command} → ${url}`);
+    try {
+      await fetch(url);
+    } catch (err) {
+      console.error(`Failed to send pump command '${command}':`, err);
+      setError('Pump ESP might be offline or unreachable.');
     }
   };
 
@@ -46,10 +58,7 @@ export default function ManualIrrigationPage() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [espIP, connected]);
 
   const handleClick = (command: string) => {
@@ -68,6 +77,12 @@ export default function ManualIrrigationPage() {
       {espIP && (
         <p className="mb-2 text-gray-700">
           ESP32 IP: <span className="font-mono">{espIP}</span>
+        </p>
+      )}
+
+      {pumpIP && (
+        <p className="mb-2 text-gray-700">
+          Pump ESP IP: <span className="font-mono">{pumpIP}</span>
         </p>
       )}
 
@@ -91,6 +106,22 @@ export default function ManualIrrigationPage() {
             <button onClick={() => handleClick('left')} className="px-6 py-2 hover:bg-blue-300 bg-green-400 text-white rounded-xl">Left (A)</button>
             <button onClick={() => handleClick('backward')} className="px-6 py-2 hover:bg-blue-300 bg-green-400 text-white rounded-xl">Backward (S)</button>
             <button onClick={() => handleClick('right')} className="px-6 py-2 hover:bg-blue-300 bg-green-400 text-white rounded-xl">Right (D)</button>
+          </div>
+
+          {/* 🆕 Pump Control Buttons */}
+          <div className="w-full max-w-md flex gap-6 justify-center mt-4">
+            <button
+              onClick={() => sendPumpCommand('start')}
+              className="px-6 py-2 bg-red-500 text-white hover:bg-red-600 rounded-xl"
+            >
+              Start Pump
+            </button>
+            <button
+              onClick={() => sendPumpCommand('stop')}
+              className="px-6 py-2 bg-gray-700 text-white hover:bg-gray-800 rounded-xl"
+            >
+              Stop Pump
+            </button>
           </div>
 
           <div className="mt-6 w-full max-w-2xl aspect-video bg-black rounded-xl overflow-hidden border-4 border-gray-700">

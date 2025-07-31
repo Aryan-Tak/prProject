@@ -1,0 +1,126 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+
+const char* ssid = "aryantak";
+const char* password = "aryantak10";
+
+ESP8266WebServer server(80);
+
+// Motor driver pins
+const int ENA = D7;
+const int ENB = D8;
+const int IN1 = D1;
+const int IN2 = D2;
+const int IN3 = D5;
+const int IN4 = D6;
+
+// Relay pin (connected to pump)
+const int RELAY_PIN = D0;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+
+  stopMotors();
+  digitalWrite(RELAY_PIN, LOW);  // Pump off
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" connected!");
+  Serial.println(WiFi.localIP());
+
+  // Motor control routes
+  server.on("/forward", moveForward);
+  server.on("/backward", moveBackward);
+  server.on("/left", turnLeft);
+  server.on("/right", turnRight);
+  server.on("/stop", stopBot);
+
+  // Pump control routes
+  server.on("/pump/on", pumpOn);
+  server.on("/pump/off", pumpOff);
+
+  server.begin();
+  Serial.println("Server started");
+}
+
+void loop() {
+  server.handleClient();
+}
+
+// ---------- Motor control ----------
+void moveForward() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 255);
+  analogWrite(ENB, 255);
+  server.send(200, "text/plain", "Moving forward");
+}
+
+void moveBackward() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, 255);
+  analogWrite(ENB, 255);
+  server.send(200, "text/plain", "Moving backward");
+}
+
+void turnLeft() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 255);
+  analogWrite(ENB, 255);
+  server.send(200, "text/plain", "Turning left");
+}
+
+void turnRight() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  analogWrite(ENA, 255);
+  analogWrite(ENB, 255);
+  server.send(200, "text/plain", "Turning right");
+}
+
+void stopBot() {
+  stopMotors();
+  server.send(200, "text/plain", "Stopped");
+}
+
+void stopMotors() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+}
+
+// ---------- Pump control ----------
+void pumpOn() {
+  digitalWrite(RELAY_PIN, HIGH);  // Depending on relay logic, sometimes LOW turns it on
+  server.send(200, "text/plain", "Pump ON");
+}
+
+void pumpOff() {
+  digitalWrite(RELAY_PIN, LOW);
+  server.send(200, "text/plain", "Pump OFF");
+}

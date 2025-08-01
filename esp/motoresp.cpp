@@ -1,24 +1,30 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266HTTPClient.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <HTTPClient.h>
 
 // WiFi credentials
 const char* ssid = "aryantak";
 const char* password = "aryantak10";
 
-// ESP32 IP address for sensor requests
-const char* esp32_ip = "192.168.1.100"; // Replace with actual ESP32 IP
+// ESP32 IP address for sensor requests (the other ESP32 with sensors)
+const char* sensor_esp32_ip = "192.168.50.76"; // Replace with actual sensor ESP32 IP
 
-ESP8266WebServer server(80);
+WebServer server(80);
 WiFiClient wifiClient;
 
-// Motor driver pins (using your existing pin configuration)
-const int ENA = D7;
-const int ENB = D8;
-const int IN1 = D1;
-const int IN2 = D2;
-const int IN3 = D5;
-const int IN4 = D6;
+// Motor driver pins for ESP32
+const int ENA = 18;  // PWM pin for motor A
+const int ENB = 19;  // PWM pin for motor B
+const int IN1 = 21;  // Motor A direction pin 1
+const int IN2 = 22;  // Motor A direction pin 2
+const int IN3 = 23;  // Motor B direction pin 1
+const int IN4 = 25;  // Motor B direction pin 2
+
+// PWM settings for ESP32
+const int freq = 1000;      // PWM frequency
+const int pwmChannelA = 0;  // PWM channel for motor A
+const int pwmChannelB = 1;  // PWM channel for motor B
+const int resolution = 8;   // PWM resolution (0-255)
 
 bool automaticMode = false;
 unsigned long moveStartTime = 0;
@@ -29,12 +35,16 @@ void setup() {
   Serial.begin(115200);
   
   // Initialize motor pins
-  pinMode(ENA, OUTPUT);
-  pinMode(ENB, OUTPUT);
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
+  
+  // Setup PWM channels for ESP32
+  ledcSetup(pwmChannelA, freq, resolution);
+  ledcSetup(pwmChannelB, freq, resolution);
+  ledcAttachPin(ENA, pwmChannelA);
+  ledcAttachPin(ENB, pwmChannelB);
   
   stopMotors();
   
@@ -58,6 +68,7 @@ void setup() {
   server.on("/stop", handleStop);
   server.on("/automatic", handleAutomatic);
   server.on("/manual", handleManual);
+  server.on("/ping", handlePing);
   
   server.begin();
   Serial.println("HTTP server started");
@@ -73,10 +84,11 @@ void loop() {
 }
 
 void handleRoot() {
-  String html = "<h1>ESP8266 Motor Control</h1>";
+  String html = "<h1>ESP32 Motor Control</h1>";
   html += "<p>Commands: /forward, /backward, /left, /right, /stop</p>";
   html += "<p>Modes: /automatic, /manual</p>";
   html += "<p>Current mode: " + String(automaticMode ? "Automatic" : "Manual") + "</p>";
+  html += "<p>IP Address: " + WiFi.localIP().toString() + "</p>";
   server.send(200, "text/html", html);
 }
 
@@ -84,47 +96,127 @@ void handleForward() {
   if (!automaticMode) {
     moveForward();
   }
-  server.send(200, "text/plain", "Moving forward");
+  
+  // Send JSON response for web app
+  String response = "{";
+  response += "\"command\":\"forward\",";
+  response += "\"status\":\"success\",";
+  response += "\"leftMotor\":\"active\",";
+  response += "\"rightMotor\":\"active\",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
+  Serial.println("Command: Forward");
 }
 
 void handleBackward() {
   if (!automaticMode) {
     moveBackward();
   }
-  server.send(200, "text/plain", "Moving backward");
+  
+  String response = "{";
+  response += "\"command\":\"backward\",";
+  response += "\"status\":\"success\",";
+  response += "\"leftMotor\":\"active\",";
+  response += "\"rightMotor\":\"active\",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
+  Serial.println("Command: Backward");
 }
 
 void handleLeft() {
   if (!automaticMode) {
     turnLeft();
   }
-  server.send(200, "text/plain", "Turning left");
+  
+  String response = "{";
+  response += "\"command\":\"left\",";
+  response += "\"status\":\"success\",";
+  response += "\"leftMotor\":\"inactive\",";
+  response += "\"rightMotor\":\"active\",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
+  Serial.println("Command: Left");
 }
 
 void handleRight() {
   if (!automaticMode) {
     turnRight();
   }
-  server.send(200, "text/plain", "Turning right");
+  
+  String response = "{";
+  response += "\"command\":\"right\",";
+  response += "\"status\":\"success\",";
+  response += "\"leftMotor\":\"active\",";
+  response += "\"rightMotor\":\"inactive\",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
+  Serial.println("Command: Right");
 }
 
 void handleStop() {
   stopMotors();
-  server.send(200, "text/plain", "Motors stopped");
+  
+  String response = "{";
+  response += "\"command\":\"stop\",";
+  response += "\"status\":\"success\",";
+  response += "\"leftMotor\":\"inactive\",";
+  response += "\"rightMotor\":\"inactive\",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
+  Serial.println("Command: Stop");
+}
+
+void handlePing() {
+  String response = "{";
+  response += "\"status\":\"online\",";
+  response += "\"device\":\"ESP32 Motor Controller\",";
+  response += "\"mode\":\"" + String(automaticMode ? "automatic" : "manual") + "\",";
+  response += "\"uptime\":" + String(millis()) + ",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
+  Serial.println("Ping received");
 }
 
 void handleAutomatic() {
   automaticMode = true;
   isMoving = false;
   moveStartTime = millis();
-  server.send(200, "text/plain", "Automatic mode enabled");
+  
+  String response = "{";
+  response += "\"command\":\"automatic\",";
+  response += "\"status\":\"success\",";
+  response += "\"mode\":\"automatic\",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
   Serial.println("Automatic mode enabled");
 }
 
 void handleManual() {
   automaticMode = false;
   stopMotors();
-  server.send(200, "text/plain", "Manual mode enabled");
+  
+  String response = "{";
+  response += "\"command\":\"manual\",";
+  response += "\"status\":\"success\",";
+  response += "\"mode\":\"manual\",";
+  response += "\"timestamp\":\"" + String(millis()) + "\"";
+  response += "}";
+  
+  server.send(200, "application/json", response);
   Serial.println("Manual mode enabled");
 }
 
@@ -141,7 +233,7 @@ void handleAutomaticMode() {
     isMoving = false;
     Serial.println("Auto mode: Stopped, requesting sensor check");
     
-    // Send request to ESP32 for sensor check and irrigation
+    // Send request to sensor ESP32 for sensor check and irrigation
     requestSensorCheck();
     
     // Wait 5 seconds before next cycle
@@ -151,15 +243,16 @@ void handleAutomaticMode() {
 
 void requestSensorCheck() {
   HTTPClient http;
-  http.begin(wifiClient, String("http://") + esp32_ip + "/check_sensors");
+  http.begin(String("http://") + sensor_esp32_ip + "/check_sensors");
+  http.setTimeout(5000); // 5 second timeout
   
   int httpResponseCode = http.GET();
   
   if (httpResponseCode > 0) {
     String response = http.getString();
-    Serial.println("ESP32 Response: " + response);
+    Serial.println("Sensor ESP32 Response: " + response);
   } else {
-    Serial.println("Error connecting to ESP32: " + String(httpResponseCode));
+    Serial.println("Error connecting to Sensor ESP32: " + String(httpResponseCode));
   }
   
   http.end();
@@ -171,8 +264,8 @@ void moveForward() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
-  analogWrite(ENA, 255);
-  analogWrite(ENB, 255);
+  ledcWrite(pwmChannelA, 255);  // Full speed
+  ledcWrite(pwmChannelB, 255);  // Full speed
   Serial.println("Moving forward");
 }
 
@@ -182,8 +275,8 @@ void moveBackward() {
   digitalWrite(IN2, HIGH);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
-  analogWrite(ENA, 255);
-  analogWrite(ENB, 255);
+  ledcWrite(pwmChannelA, 255);
+  ledcWrite(pwmChannelB, 255);
   Serial.println("Moving backward");
 }
 
@@ -193,8 +286,8 @@ void turnLeft() {
   digitalWrite(IN2, HIGH);
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
-  analogWrite(ENA, 255);
-  analogWrite(ENB, 255);
+  ledcWrite(pwmChannelA, 255);
+  ledcWrite(pwmChannelB, 255);
   Serial.println("Turning left");
 }
 
@@ -204,8 +297,8 @@ void turnRight() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
-  analogWrite(ENA, 255);
-  analogWrite(ENB, 255);
+  ledcWrite(pwmChannelA, 255);
+  ledcWrite(pwmChannelB, 255);
   Serial.println("Turning right");
 }
 
@@ -215,7 +308,7 @@ void stopMotors() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
-  analogWrite(ENA, 0);
-  analogWrite(ENB, 0);
+  ledcWrite(pwmChannelA, 0);
+  ledcWrite(pwmChannelB, 0);
   Serial.println("Motors stopped");
 }

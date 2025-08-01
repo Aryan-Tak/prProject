@@ -20,10 +20,8 @@ const int IN2 = 22;  // Motor A direction pin 2
 const int IN3 = 23;  // Motor B direction pin 1
 const int IN4 = 25;  // Motor B direction pin 2
 
-// PWM settings for ESP32
+// PWM settings for ESP32 (new API)
 const int freq = 1000;      // PWM frequency
-const int pwmChannelA = 0;  // PWM channel for motor A
-const int pwmChannelB = 1;  // PWM channel for motor B
 const int resolution = 8;   // PWM resolution (0-255)
 
 bool automaticMode = false;
@@ -40,11 +38,9 @@ void setup() {
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
   
-  // Setup PWM channels for ESP32
-  ledcSetup(pwmChannelA, freq, resolution);
-  ledcSetup(pwmChannelB, freq, resolution);
-  ledcAttachPin(ENA, pwmChannelA);
-  ledcAttachPin(ENB, pwmChannelB);
+  // Setup PWM channels for ESP32 (NEW API)
+  ledcAttach(ENA, freq, resolution);  // Attach ENA pin directly
+  ledcAttach(ENB, freq, resolution);  // Attach ENB pin directly
   
   stopMotors();
   
@@ -264,8 +260,8 @@ void moveForward() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
-  ledcWrite(pwmChannelA, 255);  // Full speed
-  ledcWrite(pwmChannelB, 255);  // Full speed
+  ledcWrite(ENA, 255);  // NEW API - use pin directly
+  ledcWrite(ENB, 255);  // NEW API - use pin directly
   Serial.println("Moving forward");
 }
 
@@ -275,8 +271,8 @@ void moveBackward() {
   digitalWrite(IN2, HIGH);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
-  ledcWrite(pwmChannelA, 255);
-  ledcWrite(pwmChannelB, 255);
+  ledcWrite(ENA, 255);
+  ledcWrite(ENB, 255);
   Serial.println("Moving backward");
 }
 
@@ -286,8 +282,8 @@ void turnLeft() {
   digitalWrite(IN2, HIGH);
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
-  ledcWrite(pwmChannelA, 255);
-  ledcWrite(pwmChannelB, 255);
+  ledcWrite(ENA, 255);
+  ledcWrite(ENB, 255);
   Serial.println("Turning left");
 }
 
@@ -297,8 +293,8 @@ void turnRight() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, HIGH);
-  ledcWrite(pwmChannelA, 255);
-  ledcWrite(pwmChannelB, 255);
+  ledcWrite(ENA, 255);
+  ledcWrite(ENB, 255);
   Serial.println("Turning right");
 }
 
@@ -308,7 +304,7 @@ void stopMotors() {
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
-  ledcWrite(pwmChannelA, 0);
-  ledcWrite(pwmChannelB, 0);
+  ledcWrite(ENA, 0);
+  ledcWrite(ENB, 0);
   Serial.println("Motors stopped");
 }

@@ -111,6 +111,45 @@ export default function ManualIrrigationPage() {
     }
   };
 
+  // Pump start command
+  const startPump = async () => {
+    logCommand("pump_start", "button");
+    if (!sensorEspIP) {
+      setIsConnected(false);
+      return;
+    }
+    try {
+      const url = `http://${sensorEspIP}/pump_start`;
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      setSensorData((prev: any) => ({ ...prev, pump: data.pump, timestamp: new Date().toLocaleTimeString() }));
+      setIsConnected(true);
+    } catch (error) {
+      handleError(error, "Pump Start");
+      setIsConnected(false);
+    }
+  };
+
+  const stopPump = async () => {
+  logCommand("pump_stop", "button");
+  if (!sensorEspIP) {
+    setIsConnected(false);
+    return;
+  }
+  try {
+    const url = `http://${sensorEspIP}/pump_stop`;
+    const response = await fetch(url, { method: 'GET' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    setSensorData((prev: any) => ({ ...prev, pump: data.pump, timestamp: new Date().toLocaleTimeString() }));
+    setIsConnected(true);
+  } catch (error) {
+    handleError(error, "Pump Stop");
+    setIsConnected(false);
+  }
+};
+
   // Debounced motor command (for keyboard)
   const debouncedMotorCommand = (command: string, source: string, delay: number = 50) => {
     if (commandTimeoutRef.current) clearTimeout(commandTimeoutRef.current);
@@ -244,6 +283,8 @@ export default function ManualIrrigationPage() {
             <button onClick={() => sendSensorCommand("read_soil")} className="bg-orange-500 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-xl">🌱 Read Soil (T)</button>
             <button onClick={() => sendSensorCommand("servo_down")} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl">⬇️ Servo Down (Q)</button>
             <button onClick={() => sendSensorCommand("servo_up")} className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl">⬆️ Servo Up (E)</button>
+            <button onClick={startPump} className="bg-pink-500 hover:bg-pink-700 text-white font-bold py-3 px-4 rounded-xl col-span-2">💧 Start Pump</button>
+            <button onClick={stopPump} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-xl col-span-2">🛑 Stop Pump</button>
           </div>
           {sensorData && (
             <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
@@ -263,6 +304,18 @@ export default function ManualIrrigationPage() {
                   <strong>Servo Position:</strong>
                   <span className="ml-2 px-2 py-1 rounded text-xs font-mono bg-blue-200 text-blue-800">
                     {sensorData.servoPosition || status.servoPosition || 'unknown'}
+                  </span>
+                </p>
+                <p className="text-sm">
+                  <strong>Pump Status:</strong>
+                  <span className={`ml-2 px-2 py-1 rounded text-xs font-mono ${
+                    sensorData.pump === 'ON' ? 'bg-pink-200 text-pink-800' :
+                    sensorData.pump === 'OFF' ? 'bg-gray-200 text-gray-800' :
+                    'bg-yellow-200 text-yellow-800'
+                  }`}>
+                    {sensorData.pump === 'ON' && 'ON'}
+                    {sensorData.pump === 'OFF' && 'OFF'}
+                    {!sensorData.pump && 'Unavailable'}
                   </span>
                 </p>
                 <p className="text-xs text-gray-600">Last updated: {sensorData.timestamp}</p>

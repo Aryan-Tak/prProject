@@ -12,7 +12,8 @@ type StatusType = {
 };
 
 export default function AutomaticIrrigationPage() {
-  const [espIP, setEspIP] = useState<string>("");
+  const [motorEspIP, setMotorEspIP] = useState<string>("");
+  const [sensorEspIP, setSensorEspIP] = useState<string>("");
   const [cameraIP, setCameraIP] = useState<string>("");
   const [cameraPort, setCameraPort] = useState<string>("8080");
   const [status, setStatus] = useState<StatusType>({ leftMotor: "", rightMotor: "" });
@@ -24,17 +25,19 @@ export default function AutomaticIrrigationPage() {
   const [autoModeStatus, setAutoModeStatus] = useState<string>("Stopped");
   const isKeyPressed = useRef<{ [key: string]: boolean }>({});
 
-  // Dynamic IP webcam URL
+  // Camera URLs
   const ipCamURL = `http://${cameraIP}:${cameraPort}/video`;
   const mjpegURL = `http://${cameraIP}:${cameraPort}/mjpegfeed?640x480`;
 
   useEffect(() => {
     // Load configuration from localStorage
     const savedMotorESP = localStorage.getItem("motorEspIP");
+    const savedSensorESP = localStorage.getItem("sensorEspIP");
     const savedCamera = localStorage.getItem("cameraIP");
     const savedPort = localStorage.getItem("cameraPort");
-    
-    if (savedMotorESP) setEspIP(savedMotorESP);
+
+    if (savedMotorESP) setMotorEspIP(savedMotorESP);
+    if (savedSensorESP) setSensorEspIP(savedSensorESP);
     if (savedCamera) setCameraIP(savedCamera);
     if (savedPort) setCameraPort(savedPort);
   }, []);
@@ -42,209 +45,127 @@ export default function AutomaticIrrigationPage() {
   const logCommand = (command: string, source: string) => {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = `[${timestamp}] ${source}: ${command}`;
-    console.log(logEntry);
     setCommandHistory(prev => [...prev.slice(-9), logEntry]);
     setLastCommand(`${command} (${source})`);
   };
 
-  const sendCommand = async (command: string, source: string = "button") => {
+  // Send movement commands to motor ESP
+  const sendMotorCommand = async (command: string, source: string = "button") => {
     logCommand(command, source);
-    
+    if (!motorEspIP) {
+      setIsConnected(false);
+      return;
+    }
     try {
-      if (!espIP) {
-        console.warn("No ESP32 IP configured");
-        return;
-      }
-
-      const url = `http://${espIP}/${command}`;
-      console.log(`Sending request to: ${url}`);
-      
-      const simulatedResponse = {
-        command: command,
-        status: "success",
-        leftMotor: command === "left" || command === "forward" ? "active" : "inactive",
-        rightMotor: command === "right" || command === "forward" ? "active" : "inactive",
-        mode: command === "automatic" ? "automatic" : (command === "manual" ? "manual" : status.mode),
-        timestamp: new Date().toISOString()
-      };
-
-      try {
-        const res = await fetch(url, { method: 'GET', });
-        
-        if (res.ok) {
-          const data = await res.json();
-          console.log("ESP32 Response:", data);
-          setStatus(prev => ({ ...prev, ...data }));
-          setIsConnected(true);
-          
-          // Update auto mode status based on ESP response
-          if (command === "automatic") {
-            setAutoModeStatus("Active - ESP32 controlling movement and sensors");
-          } else if (command === "manual") {
-            setAutoModeStatus("Stopped");
-          }
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
-      } catch (fetchError) {
-        console.warn("ESP32 not reachable, using simulated response");
-        setStatus(prev => ({ ...prev, ...simulatedResponse }));
-        setIsConnected(false);
-        
-        // Simulate auto mode status
-        if (command === "automatic") {
-          setAutoModeStatus("Simulated - No ESP32 connection");
-        } else if (command === "manual") {
-          setAutoModeStatus("Stopped");
-        }
-      }
-
+      const url = `http://${motorEspIP}/${command}`;
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      setStatus(prev => ({ ...prev, ...data }));
+      setIsConnected(true);
+      // Update auto mode status
+      if (command === "automatic") setAutoModeStatus("Active - ESP32 controlling movement and sensors");
+      if (command === "manual") setAutoModeStatus("Stopped");
     } catch (error) {
-      console.error("Command failed:", error);
+      setIsConnected(false);
+      if (command === "automatic") setAutoModeStatus("Simulated - No ESP32 connection");
+      if (command === "manual") setAutoModeStatus("Stopped");
+    }
+  };
+
+  // Send sensor/servo/pump commands to sensor ESP
+  const sendSensorCommand = async (command: string, source: string = "button") => {
+    logCommand(command, source);
+    if (!sensorEspIP) {
+      setIsConnected(false);
+      return;
+    }
+    try {
+      const url = `http://${sensorEspIP}/${command}`;
+      const response = await fetch(url, { method: 'GET' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      setSensorHistory(prev => [data, ...prev.slice(0, 4)]);
+      setIsConnected(true);
+    } catch (error) {
       setIsConnected(false);
     }
   };
 
+  // Toggle automatic mode
   const toggleAutomaticMode = async () => {
     const newMode = !isAutoMode;
     setIsAutoMode(newMode);
-    
+
     if (newMode) {
       logCommand("AUTOMATIC MODE ENABLED", "system");
       setAutoModeStatus("Starting automatic mode...");
-      await sendCommand("automatic", "system");
-      
-      console.log("🤖 Automatic mode enabled - ESP32 will handle everything independently");
-      console.log("ESP32 Logic: Check sensors → Move forward 3s → Stop → Wait → Repeat");
-      
+      await sendMotorCommand("automatic", "system");
+      await sendSensorCommand("automatic", "system");
     } else {
       logCommand("MANUAL MODE ENABLED", "system");
       setAutoModeStatus("Stopping automatic mode...");
-      await sendCommand("manual", "system");
+      await sendMotorCommand("manual", "system");
       setAutoModeStatus("Stopped");
-      
-      console.log("👤 Manual mode enabled - WASD controls available");
-    }
-  };
-
-  const checkSensors = async () => {
-    try {
-      const url = `http://${espIP}/start_sensor`; // Use the new sensor endpoint
-      
-      console.log(`Checking sensors: ${url}`);
-      
-      const simulatedSensorData = {
-        status: "success",
-        soilMoisture: Math.floor(Math.random() * 1000) + 2000,
-        soilStatus: Math.random() > 0.5 ? "DRY" : "MOIST",
-        servoMoved: true,
-        needsIrrigation: Math.random() > 0.7,
-        message: "Sensor check completed",
-        timestamp: new Date().toLocaleTimeString(),
-      };
-
-      try {
-        const res = await fetch(url, { method: 'GET', });
-        
-        if (res.ok) {
-          const data = await res.json();
-          console.log("Sensor Response:", data);
-          setSensorHistory(prev => [data, ...prev.slice(0, 4)]);
-          setIsConnected(true);
-        } else {
-          throw new Error(`HTTP ${res.status}`);
-        }
-      } catch (fetchError) {
-        console.warn("ESP32 not reachable, using simulated sensor data");
-        setSensorHistory(prev => [simulatedSensorData, ...prev.slice(0, 4)]);
-        setIsConnected(false);
-      }
-
-    } catch (error) {
-      console.error("Sensor check failed:", error);
     }
   };
 
   // Manual controls (only available when NOT in auto mode)
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (isAutoMode) {
-      console.log("⚠️ Manual controls disabled - ESP32 is in automatic mode");
-      return;
-    }
-    
+    if (isAutoMode) return;
     if (isKeyPressed.current[e.key]) return;
     isKeyPressed.current[e.key] = true;
 
     switch (e.key.toLowerCase()) {
-      case "w":
-        sendCommand("forward", "keyboard");
-        break;
-      case "a":
-        sendCommand("left", "keyboard");
-        break;
-      case "s":
-        sendCommand("backward", "keyboard");
-        break;
-      case "d":
-        sendCommand("right", "keyboard");
-        break;
-      case " ":
-        e.preventDefault();
-        checkSensors();
-        break;
+      case "w": sendMotorCommand("forward", "keyboard"); break;
+      case "a": sendMotorCommand("left", "keyboard"); break;
+      case "s": sendMotorCommand("backward", "keyboard"); break;
+      case "d": sendMotorCommand("right", "keyboard"); break;
+      case "r": sendSensorCommand("start_sensor", "keyboard"); break;
+      case "t": sendSensorCommand("read_soil", "keyboard"); break;
+      case "q": sendSensorCommand("servo_down", "keyboard"); break;
+      case "e": sendSensorCommand("servo_up", "keyboard"); break;
     }
   };
 
   const handleKeyUp = (e: KeyboardEvent) => {
     if (isAutoMode) return;
-    if (e.key.toLowerCase() === " ") return;
-    
     isKeyPressed.current[e.key] = false;
-    sendCommand("stop", "keyboard");
+    if (["w", "a", "s", "d"].includes(e.key.toLowerCase())) {
+      sendMotorCommand("stop", "keyboard");
+    }
   };
 
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("keydown", handleKeyDown as EventListener);
+    window.addEventListener("keyup", handleKeyUp as EventListener);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keydown", handleKeyDown as EventListener);
+      window.removeEventListener("keyup", handleKeyUp as EventListener);
     };
-  }, [espIP, isAutoMode]);
+  }, [motorEspIP, sensorEspIP, isAutoMode]);
 
-  // Auto status polling - check ESP32 status while in automatic mode
+  // Status polling - check ESP32 status while in automatic mode
   useEffect(() => {
     if (isAutoMode && isConnected) {
       const statusInterval = setInterval(async () => {
         try {
-          const res = await fetch(`http://${espIP}/status`, { method: 'GET',  });
+          const res = await fetch(`http://${motorEspIP}/status`, { method: 'GET' });
           if (res.ok) {
             const data = await res.json();
-            console.log("ESP32 Status:", data);
-            
+            setStatus(prev => ({ ...prev, ...data }));
             if (data.mode === "automatic") {
               setAutoModeStatus(`Active - ${data.status || "Running automatic cycle"}`);
             }
-            
-            // Update sensor data if available
-            if (data.soilMoisture !== undefined) {
-              setSensorHistory(prev => [{
-                soilMoisture: data.soilMoisture,
-                soilStatus: data.soilStatus,
-                servoPosition: data.servoPosition,
-                message: "Automatic sensor reading",
-                timestamp: new Date().toLocaleTimeString()
-              }, ...prev.slice(0, 4)]);
-            }
           }
         } catch (error) {
-          console.log("Status check failed - ESP32 may be busy with automatic operations");
+          // ESP32 may be busy
         }
       }, 15000); // Check every 15 seconds
 
       return () => clearInterval(statusInterval);
     }
-  }, [isAutoMode, isConnected, espIP]);
+  }, [isAutoMode, isConnected, motorEspIP]);
 
   return (
     <div className="p-6 bg-gradient-to-br from-green-100 to-blue-100 min-h-screen flex flex-col items-center">
@@ -255,14 +176,11 @@ export default function AutomaticIrrigationPage() {
         <button
           onClick={toggleAutomaticMode}
           className={`px-8 py-3 rounded-xl font-bold text-white transition duration-300 ${
-            isAutoMode 
-              ? 'bg-red-500 hover:bg-red-600' 
-              : 'bg-green-500 hover:bg-green-600'
+            isAutoMode ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
           }`}
         >
           {isAutoMode ? '🛑 Stop Automatic Mode' : '🤖 Start Automatic Mode'}
         </button>
-        
         {/* Auto Mode Status */}
         {isAutoMode && (
           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -279,16 +197,12 @@ export default function AutomaticIrrigationPage() {
       {/* Status Indicators */}
       <div className="mb-6 flex gap-4 justify-center flex-wrap">
         <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-          isConnected 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-yellow-100 text-yellow-800'
+          isConnected ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
         }`}>
           {isConnected ? '🟢 ESP32 Connected' : '🟡 ESP32 Simulation'}
         </span>
         <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-          isAutoMode 
-            ? 'bg-blue-100 text-blue-800' 
-            : 'bg-gray-100 text-gray-800'
+          isAutoMode ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
         }`}>
           {isAutoMode ? '🤖 ESP32 Auto Control' : '👤 Manual Mode'}
         </span>
@@ -305,30 +219,19 @@ export default function AutomaticIrrigationPage() {
               className="w-full h-full object-cover"
               onLoad={() => console.log("Camera feed loaded successfully")}
               onError={(e) => {
-                console.error("Camera feed error, trying alternative URL");
                 e.currentTarget.src = ipCamURL;
                 e.currentTarget.onerror = () => {
-                  console.error("Both camera URLs failed");
                   e.currentTarget.src = 'https://via.placeholder.com/640x360/333333/ffffff?text=Camera+Offline';
                 };
               }}
               crossOrigin="anonymous"
             />
-            
-            <button
-              onClick={checkSensors}
-              className="absolute bottom-4 right-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300"
-            >
-              🔍 Check Sensors
-            </button>
           </div>
-
           {/* Manual Controls - Only shown when NOT in auto mode */}
           <div className="mt-6">
             <h4 className="text-md font-semibold mb-3 text-gray-800 text-center">
               {isAutoMode ? "Manual Controls (ESP32 Auto Mode Active)" : "Manual Controls"}
             </h4>
-            
             {isAutoMode ? (
               <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="text-2xl mb-2">🤖</div>
@@ -340,70 +243,38 @@ export default function AutomaticIrrigationPage() {
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
-                <div />
-                <button
-                  onClick={() => sendCommand("forward", "button")}
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 text-sm"
-                >
-                  ↑ W
-                </button>
-                <div />
-
-                <button
-                  onClick={() => sendCommand("left", "button")}
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 text-sm"
-                >
-                  ← A
-                </button>
-                <button
-                  onClick={() => sendCommand("stop", "button")}
-                  className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 text-sm"
-                >
-                  ⏹ Stop
-                </button>
-                <button
-                  onClick={() => sendCommand("right", "button")}
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 text-sm"
-                >
-                  → D
-                </button>
-
-                <div />
-                <button
-                  onClick={() => sendCommand("backward", "button")}
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 text-sm"
-                >
-                  ↓ S
-                </button>
-                <div />
+                <button onClick={() => sendMotorCommand("forward")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">↑ W</button>
+                <button onClick={() => sendMotorCommand("left")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">← A</button>
+                <button onClick={() => sendMotorCommand("stop")} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">⏹ Stop</button>
+                <button onClick={() => sendMotorCommand("right")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">→ D</button>
+                <button onClick={() => sendMotorCommand("backward")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">↓ S</button>
               </div>
             )}
           </div>
         </div>
-
         {/* Sensor Data & Status */}
         <div className="bg-white rounded-xl shadow-lg p-4">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">Sensor Data & Status</h3>
-          
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <button onClick={() => sendSensorCommand("start_sensor")} className="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl">🔍 Start Sensor (R)</button>
+            <button onClick={() => sendSensorCommand("read_soil")} className="bg-orange-500 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-xl">🌱 Read Soil (T)</button>
+            <button onClick={() => sendSensorCommand("servo_down")} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl">⬇️ Servo Down (Q)</button>
+            <button onClick={() => sendSensorCommand("servo_up")} className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl">⬆️ Servo Up (E)</button>
+          </div>
           {sensorHistory.length > 0 ? (
             <div className="space-y-4">
               {sensorHistory.map((data, index) => (
                 <div key={index} className={`p-4 rounded-lg border-2 ${
-                  data.needsIrrigation || data.soilStatus === 'DRY'
-                    ? 'bg-red-50 border-red-200' 
-                    : 'bg-green-50 border-green-200'
+                  data.soilStatus === 'DRY' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
                 }`}>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-lg font-semibold">
-                      {data.needsIrrigation || data.soilStatus === 'DRY' ? '🚨 Dry Soil Detected' : '✅ Soil OK'}
+                      {data.soilStatus === 'DRY' ? '🚨 Dry Soil Detected' : '✅ Soil OK'}
                     </h4>
-                    <span className="text-sm text-gray-600">
-                      Reading #{index + 1}
-                    </span>
+                    <span className="text-sm text-gray-600">Reading #{index + 1}</span>
                   </div>
-                  
                   <div className="space-y-2">
-                    <p><strong>Soil Moisture:</strong> 
+                    <p><strong>Soil Moisture:</strong>
                       <span className={`ml-2 px-2 py-1 rounded text-xs font-mono ${
                         data.soilStatus === 'DRY' ? 'bg-red-200 text-red-800' :
                         data.soilStatus === 'MOIST' ? 'bg-yellow-200 text-yellow-800' :
@@ -412,12 +283,11 @@ export default function AutomaticIrrigationPage() {
                         {data.soilMoisture} ({data.soilStatus})
                       </span>
                     </p>
-                    <p><strong>Servo Position:</strong> 
+                    <p><strong>Servo Position:</strong>
                       <span className="ml-2 px-2 py-1 rounded text-xs font-mono bg-blue-200 text-blue-800">
                         {data.servoPosition || 'up'}
                       </span>
                     </p>
-                    <p><strong>Message:</strong> {data.message}</p>
                     <p className="text-xs text-gray-500">{data.timestamp}</p>
                   </div>
                 </div>
@@ -428,14 +298,13 @@ export default function AutomaticIrrigationPage() {
               <div className="text-4xl mb-2">🌱</div>
               <p>No sensor data yet</p>
               <p className="text-sm">
-                {isAutoMode 
-                  ? "ESP32 will check sensors automatically every 30 seconds" 
-                  : "Press SPACEBAR or 'Check Sensors' to start"
+                {isAutoMode
+                  ? "ESP32 will check sensors automatically every 30 seconds"
+                  : "Press sensor buttons or keys to start"
                 }
               </p>
             </div>
           )}
-
           {/* Status Panel */}
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-gray-50 p-3 rounded-lg">
@@ -446,7 +315,6 @@ export default function AutomaticIrrigationPage() {
               <p className="text-xs">Mode: <span className="font-mono">{isAutoMode ? "ESP32 Automatic" : "Manual"}</span></p>
               <p className="text-xs">Last Command: <span className="font-mono">{lastCommand || "none"}</span></p>
             </div>
-
             <div className="bg-gray-50 p-3 rounded-lg">
               <h4 className="text-sm font-semibold mb-2 text-gray-800">Command History</h4>
               <div className="text-xs space-y-1 max-h-16 overflow-y-auto">
@@ -462,7 +330,6 @@ export default function AutomaticIrrigationPage() {
           </div>
         </div>
       </div>
-
       {/* Updated Instructions */}
       <div className="mt-6 w-full max-w-6xl bg-white p-4 rounded-xl shadow-lg">
         <h3 className="text-lg font-semibold mb-2 text-gray-800">How Automatic Mode Works:</h3>
@@ -482,7 +349,7 @@ export default function AutomaticIrrigationPage() {
             <ul className="text-sm text-gray-600 space-y-1">
               <li>• Available only when automatic mode is OFF</li>
               <li>• Use WASD keys for movement</li>
-              <li>• Press SPACEBAR to check sensors manually</li>
+              <li>• Use R/T/Q/E keys for sensor/servo</li>
               <li>• Click buttons as alternative to keys</li>
             </ul>
           </div>

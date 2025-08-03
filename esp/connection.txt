@@ -2,3 +2,8 @@ L298N
 Black Wire = out4 , out2
 Normal = out3 , out1
 
+
+
+Motor ESP : 10.109.46.244
+Sensor ESP :  10.21.120.98
+nodeMCU-  192.168.50.76

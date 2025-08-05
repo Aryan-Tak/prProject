@@ -1,20 +1,23 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESP32Servo.h> 
 
-// WiFi credentials
 const char* ssid = "SDP";
 const char* password = "123456789";
 
-// Relay and pump pin
-const int RELAY_PIN = 15; // Relay IN connected to GPIO15
-const int SOIL_PIN = 13;
+const int RELAY_PIN = 15; // Pump relay
+const int SERVO_PIN = 12; // Servo signal
+const int SOIL_PIN = 13;  // Soil sensor
 
 WebServer server(80);
+Servo soilServo;
 
 void setup() {
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, HIGH); // Pump OFF at startup
+
+  soilServo.attach(SERVO_PIN);
   pinMode(SOIL_PIN, INPUT);
 
   WiFi.begin(ssid, password);
@@ -31,6 +34,7 @@ void setup() {
   server.on("/pump_start", HTTP_GET, handlePumpStart);
   server.on("/pump_stop", HTTP_GET, handlePumpStop);
   server.on("/servo_start", HTTP_GET, handleServoStart);
+  server.on("/servo_stop", HTTP_GET, handleServoStop);
 
   server.begin();
   Serial.println("HTTP server started");
@@ -41,10 +45,11 @@ void loop() {
 }
 
 void handleRoot() {
-  String html = "<!DOCTYPE html><html><head><title>Pump Control</title></head><body>";
-  html += "<h1>ESP32 Pump Control</h1>";
+  String html = "<!DOCTYPE html><html><head><title>Pump & Servo Control</title></head><body>";
+  html += "<h1>ESP32 Pump & Servo Control</h1>";
   html += "<button onclick=\"fetch('/pump_start')\">💧 Start Pump</button> ";
-  html += "<button onclick=\"fetch('/pump_stop')\">🛑 Stop Pump</button>";
+  html += "<button onclick=\"fetch('/pump_stop')\">🛑 Stop Pump</button> ";
+  html += "<button onclick=\"fetch('/servo_start')\">🔄 Start Servo & Read Soil</button>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
@@ -64,14 +69,23 @@ void handlePumpStop() {
 }
 
 void handleServoStart() {
+  soilServo.write(30); // Move servo to 30°
+  delay(500); // Wait for servo to move
 
+  int soilValue = analogRead(SOIL_PIN); // Read soil sensor
 
-  int soilValue = analogRead(SOIL_PIN); // Read soil sensor on G13
-
-  Serial.printf("Soil sensor reading (G13): %d\n", soilValue);
+  Serial.printf("Servo moved to 30°, Soil sensor reading: %d\n", soilValue);
 
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", 
-    String("{\"soil_value\":") + soilValue + "}"
+    String("{\"servo_angle\":30,\"soil_value\":") + soilValue + "}"
   );
+}
+
+void handleServoStop() {
+  soilServo.write(0); // Move servo to 0° (stop position)
+  delay(500);
+  Serial.println("Servo stopped (moved to 0°)");
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", "{\"servo\":\"stopped\",\"angle\":0}");
 }

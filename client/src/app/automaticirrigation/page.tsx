@@ -40,6 +40,11 @@ export default function AutomaticIrrigationPage() {
     if (savedSensorESP) setSensorEspIP(savedSensorESP);
     if (savedCamera) setCameraIP(savedCamera);
     if (savedPort) setCameraPort(savedPort);
+
+    // Send sensor IP to motor ESP on load
+    if (savedMotorESP && savedSensorESP) {
+      fetch(`http://${savedMotorESP}/set_sensor_ip?ip=${savedSensorESP}`);
+    }
   }, []);
 
   const logCommand = (command: string, source: string) => {
@@ -49,7 +54,7 @@ export default function AutomaticIrrigationPage() {
     setLastCommand(`${command} (${source})`);
   };
 
-  // Send movement commands to motor ESP
+  // Send movement/auto/manual commands to motor ESP
   const sendMotorCommand = async (command: string, source: string = "button") => {
     logCommand(command, source);
     if (!motorEspIP) {
@@ -60,10 +65,10 @@ export default function AutomaticIrrigationPage() {
       const url = `http://${motorEspIP}/${command}`;
       const response = await fetch(url, { method: 'GET' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
+      let data = {};
+      try { data = await response.json(); } catch {}
       setStatus(prev => ({ ...prev, ...data }));
       setIsConnected(true);
-      // Update auto mode status
       if (command === "automatic") setAutoModeStatus("Active - ESP32 controlling movement and sensors");
       if (command === "manual") setAutoModeStatus("Stopped");
     } catch (error) {
@@ -73,7 +78,7 @@ export default function AutomaticIrrigationPage() {
     }
   };
 
-  // Send sensor/servo/pump commands to sensor ESP
+  // Send sensor/servo/pump commands to sensor ESP (manual only)
   const sendSensorCommand = async (command: string, source: string = "button") => {
     logCommand(command, source);
     if (!sensorEspIP) {
@@ -100,8 +105,12 @@ export default function AutomaticIrrigationPage() {
     if (newMode) {
       logCommand("AUTOMATIC MODE ENABLED", "system");
       setAutoModeStatus("Starting automatic mode...");
+      // Send sensor IP to motor ESP (if not already sent)
+      if (motorEspIP && sensorEspIP) {
+        await fetch(`http://${motorEspIP}/set_sensor_ip?ip=${sensorEspIP}`);
+      }
+      // Only send automatic command to motor ESP
       await sendMotorCommand("automatic", "system");
-      await sendSensorCommand("automatic", "system");
     } else {
       logCommand("MANUAL MODE ENABLED", "system");
       setAutoModeStatus("Stopping automatic mode...");

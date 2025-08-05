@@ -81,7 +81,7 @@ export default function SurveillancePage() {
       try {
         const res = await fetch(url, { 
           method: 'GET',
-          timeout: 2000
+          
         });
         
         if (res.ok) {
@@ -105,6 +105,28 @@ export default function SurveillancePage() {
     }
   };
 
+  function isImageBlankOrBlack(img: HTMLImageElement): boolean {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+
+  canvas.width = img.naturalWidth || 640;
+  canvas.height = img.naturalHeight || 480;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let blackPixels = 0;
+  for (let i = 0; i < imageData.length; i += 4) {
+    // If R,G,B all < 10, count as black pixel
+    if (imageData[i] < 10 && imageData[i + 1] < 10 && imageData[i + 2] < 10) {
+      blackPixels++;
+    }
+  }
+  const percentBlack = blackPixels / (canvas.width * canvas.height);
+  // If more than 95% pixels are black, treat as blank/black image
+  return percentBlack > 0.95;
+}
+
   const testMLConnection = async () => {
     try {
       const response = await fetch(`${mlApiURL}/health`);
@@ -126,6 +148,21 @@ export default function SurveillancePage() {
       console.error("Camera image not found or ML API not connected");
       return;
     }
+
+    if (isImageBlankOrBlack(imgRef.current)) {
+    alert("Camera image is blank or black. Please check your camera feed.");
+    return;
+    }
+
+  const src = imgRef.current.src;
+  if (
+    !src ||
+    src.includes('placeholder.com') ||
+    src.includes('Camera+Offline')
+  ) {
+    alert("Camera feed is not available. Please check your camera connection.");
+    return;
+  }
 
     setIsAnalyzing(true);
     
@@ -426,11 +463,10 @@ export default function SurveillancePage() {
                   <h4 className="text-lg font-semibold">
                     {predictionResult.is_healthy ? '✅ Healthy Plant' : '⚠️ Disease Detected'}
                   </h4>
-                  <span className="text-sm text-gray-600">
+                  {/* <span className="text-sm text-gray-600">
                     {(predictionResult.confidence * 100).toFixed(1)}% confidence
-                  </span>
+                  </span> */}
                 </div>
-                
                 <div className="space-y-2">
                   <p><strong>Plant:</strong> {predictionResult.plant.replace(/_/g, ' ')}</p>
                   <p><strong>Condition:</strong> {predictionResult.disease.replace(/_/g, ' ')}</p>

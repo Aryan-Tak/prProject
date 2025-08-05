@@ -58,6 +58,29 @@ export default function ManualIrrigationPage() {
       console.error(`🔴 ${context} unknown error:`, String(error));
     }
   };
+//   const startServoAndReadSoil = async () => {
+//   logCommand("servo_start", "button");
+//   if (!sensorEspIP) {
+//     setIsConnected(false);
+//     return;
+//   }
+//   try {
+//     const url = `http://${sensorEspIP}/servo_start`;
+//     const response = await fetch(url, { method: 'GET' });
+//     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+//     const data = await response.json();
+//     setSensorData((prev: any) => ({
+//       ...prev,
+//       servoAngle: data.servo_angle,
+//       soilValue: data.soil_value,
+//       timestamp: new Date().toLocaleTimeString()
+//     }));
+//     setIsConnected(true);
+//   } catch (error) {
+//     handleError(error, "Servo & Soil");
+//     setIsConnected(false);
+//   }
+// };
 
   const logCommand = (command: string, source: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -87,29 +110,29 @@ export default function ManualIrrigationPage() {
   };
 
   // Send sensor/servo commands to sensor ESP
-  const sendSensorCommand = async (command: string, source: string = "button") => {
-    logCommand(command, source);
-    if (!sensorEspIP) {
-      setIsConnected(false);
-      return;
-    }
-    try {
-      const url = `http://${sensorEspIP}/${command}`;
-      const response = await fetch(url, { method: 'GET' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      setSensorData({
-        soilMoisture: data.soilMoisture,
-        soilStatus: data.soilStatus,
-        servoPosition: data.servoPosition,
-        timestamp: new Date().toLocaleTimeString()
-      });
-      setIsConnected(true);
-    } catch (error) {
-      handleError(error, "Sensor ESP");
-      setIsConnected(false);
-    }
-  };
+  // const sendSensorCommand = async (command: string, source: string = "button") => {
+  //   logCommand(command, source);
+  //   if (!sensorEspIP) {
+  //     setIsConnected(false);
+  //     return;
+  //   }
+  //   try {
+  //     const url = `http://${sensorEspIP}/${command}`;
+  //     const response = await fetch(url, { method: 'GET' });
+  //     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  //     const data = await response.json();
+  //     setSensorData({
+  //       soilMoisture: data.soilMoisture,
+  //       soilStatus: data.soilStatus,
+  //       servoPosition: data.servoPosition,
+  //       timestamp: new Date().toLocaleTimeString()
+  //     });
+  //     setIsConnected(true);
+  //   } catch (error) {
+  //     handleError(error, "Sensor ESP");
+  //     setIsConnected(false);
+  //   }
+  // };
 
   // Pump start command
   const startPump = async () => {
@@ -131,6 +154,29 @@ export default function ManualIrrigationPage() {
     }
   };
 
+  const readSoilSensor = async () => {
+  logCommand("servo_start", "button");
+  if (!sensorEspIP) {
+    setIsConnected(false);
+    return;
+  }
+  try {
+    const url = `http://${sensorEspIP}/servo_start`;
+    const response = await fetch(url, { method: 'GET' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    setSensorData((prev: any) => ({
+      ...prev,
+      soilValue: data.soil_value,
+      timestamp: new Date().toLocaleTimeString()
+    }));
+    setIsConnected(true);
+  } catch (error) {
+    handleError(error, "Read Soil Sensor");
+    setIsConnected(false);
+  }
+};
+
   const stopPump = async () => {
   logCommand("pump_stop", "button");
   if (!sensorEspIP) {
@@ -149,7 +195,29 @@ export default function ManualIrrigationPage() {
     setIsConnected(false);
   }
 };
-
+// const stopServo = async () => {
+//   logCommand("servo_stop", "button");
+//   if (!sensorEspIP) {
+//     setIsConnected(false);
+//     return;
+//   }
+//   try {
+//     const url = `http://${sensorEspIP}/servo_stop`;
+//     const response = await fetch(url, { method: 'GET' });
+//     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+//     const data = await response.json();
+//     setSensorData((prev: any) => ({
+//       ...prev,
+//       servoAngle: data.angle,
+//       servoStatus: data.servo,
+//       timestamp: new Date().toLocaleTimeString()
+//     }));
+//     setIsConnected(true);
+//   } catch (error) {
+//     handleError(error, "Servo Stop");
+//     setIsConnected(false);
+//   }
+// };
   // Debounced motor command (for keyboard)
   const debouncedMotorCommand = (command: string, source: string, delay: number = 50) => {
     if (commandTimeoutRef.current) clearTimeout(commandTimeoutRef.current);
@@ -159,12 +227,12 @@ export default function ManualIrrigationPage() {
   };
 
   // Debounced sensor command (for keyboard)
-  const debouncedSensorCommand = (command: string, source: string, delay: number = 50) => {
-    if (commandTimeoutRef.current) clearTimeout(commandTimeoutRef.current);
-    commandTimeoutRef.current = setTimeout(() => {
-      sendSensorCommand(command, source);
-    }, delay);
-  };
+  // const debouncedSensorCommand = (command: string, source: string, delay: number = 50) => {
+  //   if (commandTimeoutRef.current) clearTimeout(commandTimeoutRef.current);
+  //   commandTimeoutRef.current = setTimeout(() => {
+  //     sendSensorCommand(command, source);
+  //   }, delay);
+  // };
 
   // Keyboard controls
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -176,10 +244,10 @@ export default function ManualIrrigationPage() {
       case "a": debouncedMotorCommand("left", "keyboard", 30); break;
       case "s": debouncedMotorCommand("backward", "keyboard", 30); break;
       case "d": debouncedMotorCommand("right", "keyboard", 30); break;
-      case "r": debouncedSensorCommand("start_sensor", "keyboard", 30); break;
-      case "t": debouncedSensorCommand("read_soil", "keyboard", 30); break;
-      case "q": debouncedSensorCommand("servo_down", "keyboard", 30); break;
-      case "e": debouncedSensorCommand("servo_up", "keyboard", 30); break;
+      // case "r": debouncedSensorCommand("start_sensor", "keyboard", 30); break;
+      // case "t": debouncedSensorCommand("read_soil", "keyboard", 30); break;
+      // case "q": debouncedSensorCommand("servo_down", "keyboard", 30); break;
+      // case "e": debouncedSensorCommand("servo_up", "keyboard", 30); break;
       case " ": e.preventDefault(); takeScreenshot(); break;
     }
   };
@@ -279,12 +347,30 @@ export default function ManualIrrigationPage() {
         <div className="bg-white rounded-xl shadow-lg p-4">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">Sensor & Servo Controls</h3>
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => sendSensorCommand("start_sensor")} className="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl">🔍 Start Sensor (R)</button>
+            {/* <button
+  onClick={startServoAndReadSoil}
+  className="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-xl col-span-2"
+>
+  🔄 Move Servo & Read Soil
+</button>
+<button
+  onClick={stopServo}
+  className="bg-red-500 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl col-span-2"
+>
+  ⏹ Stop Servo
+</button> */}
+            {/* <button onClick={() => sendSensorCommand("start_sensor")} className="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl">🔍 Start Sensor (R)</button>
             <button onClick={() => sendSensorCommand("read_soil")} className="bg-orange-500 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-xl">🌱 Read Soil (T)</button>
             <button onClick={() => sendSensorCommand("servo_down")} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl">⬇️ Servo Down (Q)</button>
-            <button onClick={() => sendSensorCommand("servo_up")} className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl">⬆️ Servo Up (E)</button>
+            <button onClick={() => sendSensorCommand("servo_up")} className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl">⬆️ Servo Up (E)</button> */}
             <button onClick={startPump} className="bg-pink-500 hover:bg-pink-700 text-white font-bold py-3 px-4 rounded-xl col-span-2">💧 Start Pump</button>
             <button onClick={stopPump} className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-xl col-span-2">🛑 Stop Pump</button>
+            <button
+                  onClick={readSoilSensor}
+                 className="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl col-span-2"
+              >
+   Read Soil Sensor
+</button>
           </div>
           {sensorData && (
             <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
@@ -322,6 +408,30 @@ export default function ManualIrrigationPage() {
               </div>
             </div>
           )}
+          {/* {sensorData?.servoAngle !== undefined && (
+  <p className="text-sm">
+    <strong>Servo Angle:</strong>
+    <span className="ml-2 px-2 py-1 rounded text-xs font-mono bg-blue-100 text-blue-800">
+      {sensorData.servoAngle}°
+    </span>
+  </p>
+)}
+{sensorData?.soilValue !== undefined && (
+  <p className="text-sm">
+    <strong>Soil Sensor Value:</strong>
+    <span className="ml-2 px-2 py-1 rounded text-xs font-mono bg-green-100 text-green-800">
+      {sensorData.soilValue}
+    </span>
+  </p>
+)} */}
+{sensorData?.soilValue !== undefined && (
+  <p className="text-sm">
+    <strong>Soil Sensor Value (G13):</strong>
+    <span className="ml-2 px-2 py-1 rounded text-xs font-mono bg-green-100 text-green-800">
+      {sensorData.soilValue}
+    </span>
+  </p>
+)}
         </div>
       </div>
       {/* Command History */}

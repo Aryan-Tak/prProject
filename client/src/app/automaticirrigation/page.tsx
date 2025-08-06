@@ -178,7 +178,7 @@ export default function AutomaticIrrigationPage() {
 
   return (
     <div className="p-6 bg-gradient-to-br from-green-100 to-blue-100 min-h-screen flex flex-col items-center">
-      <h1 className="text-4xl font-bold mb-6 text-green-800">🤖 Automatic Irrigation System</h1>
+      <h1 className="text-4xl font-bold mb-6 text-green-800"> Automatic Irrigation System</h1>
 
       {/* Mode Toggle */}
       <div className="mb-6 text-center">
@@ -188,7 +188,7 @@ export default function AutomaticIrrigationPage() {
             isAutoMode ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
           }`}
         >
-          {isAutoMode ? '🛑 Stop Automatic Mode' : '🤖 Start Automatic Mode'}
+          {isAutoMode ? ' Stop Automatic Mode' : ' Start Automatic Mode'}
         </button>
         {/* Auto Mode Status */}
         {isAutoMode && (
@@ -213,7 +213,7 @@ export default function AutomaticIrrigationPage() {
         <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
           isAutoMode ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
         }`}>
-          {isAutoMode ? '🤖 ESP32 Auto Control' : '👤 Manual Mode'}
+          {isAutoMode ? ' ESP32 Auto Control' : ' Manual Mode'}
         </span>
       </div>
 
@@ -243,7 +243,7 @@ export default function AutomaticIrrigationPage() {
             </h4>
             {isAutoMode ? (
               <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-2xl mb-2">🤖</div>
+                <div className="text-2xl mb-2"></div>
                 <p className="text-sm text-blue-800 font-medium">ESP32 Automatic Control Active</p>
                 <p className="text-xs text-blue-600 mt-1">
                   Robot is managing sensors and movement independently.<br/>
@@ -254,7 +254,7 @@ export default function AutomaticIrrigationPage() {
               <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
                 <button onClick={() => sendMotorCommand("forward")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">↑ W</button>
                 <button onClick={() => sendMotorCommand("left")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">← A</button>
-                <button onClick={() => sendMotorCommand("stop")} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">⏹ Stop</button>
+                <button onClick={() => sendMotorCommand("stop")} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg"> Stop</button>
                 <button onClick={() => sendMotorCommand("right")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">→ D</button>
                 <button onClick={() => sendMotorCommand("backward")} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">↓ S</button>
               </div>
@@ -265,10 +265,10 @@ export default function AutomaticIrrigationPage() {
         <div className="bg-white rounded-xl shadow-lg p-4">
           <h3 className="text-lg font-semibold mb-4 text-gray-800">Sensor Data & Status</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <button onClick={() => sendSensorCommand("start_sensor")} className="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl">🔍 Start Sensor (R)</button>
-            <button onClick={() => sendSensorCommand("read_soil")} className="bg-orange-500 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-xl">🌱 Read Soil (T)</button>
-            <button onClick={() => sendSensorCommand("servo_down")} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl">⬇️ Servo Down (Q)</button>
-            <button onClick={() => sendSensorCommand("servo_up")} className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl">⬆️ Servo Up (E)</button>
+            <button onClick={() => sendSensorCommand("start_sensor")} className="bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl"> Start Sensor (R)</button>
+            <button onClick={() => sendSensorCommand("read_soil")} className="bg-orange-500 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-xl"> Read Soil (T)</button>
+            <button onClick={() => sendSensorCommand("servo_down")} className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl">⬇ Servo Down (Q)</button>
+            <button onClick={() => sendSensorCommand("servo_up")} className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl">⬆ Servo Up (E)</button>
           </div>
           {sensorHistory.length > 0 ? (
             <div className="space-y-4">
@@ -278,7 +278,7 @@ export default function AutomaticIrrigationPage() {
                 }`}>
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-lg font-semibold">
-                      {data.soilStatus === 'DRY' ? '🚨 Dry Soil Detected' : '✅ Soil OK'}
+                      {data.soilStatus === 'DRY' ? ' Dry Soil Detected' : 'Soil OK'}
                     </h4>
                     <span className="text-sm text-gray-600">Reading #{index + 1}</span>
                   </div>
@@ -304,7 +304,7 @@ export default function AutomaticIrrigationPage() {
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">🌱</div>
+              <div className="text-4xl mb-2"></div>
               <p>No sensor data yet</p>
               <p className="text-sm">
                 {isAutoMode
@@ -344,7 +344,7 @@ export default function AutomaticIrrigationPage() {
         <h3 className="text-lg font-semibold mb-2 text-gray-800">How Automatic Mode Works:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <h4 className="font-semibold text-green-700 mb-2">🤖 ESP32 Automatic Logic:</h4>
+            <h4 className="font-semibold text-green-700 mb-2"> ESP32 Automatic Logic:</h4>
             <ul className="text-sm text-gray-600 space-y-1">
               <li>1. Lower servo and check soil moisture</li>
               <li>2. Raise servo back up</li>
@@ -354,12 +354,12 @@ export default function AutomaticIrrigationPage() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-blue-700 mb-2">👤 Manual Controls:</h4>
+            <h4 className="font-semibold text-blue-700 mb-2"> Manual Controls:</h4>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Available only when automatic mode is OFF</li>
-              <li>• Use WASD keys for movement</li>
-              <li>• Use R/T/Q/E keys for sensor/servo</li>
-              <li>• Click buttons as alternative to keys</li>
+              <li> Available only when automatic mode is OFF</li>
+              <li> Use WASD keys for movement</li>
+              <li> Use R/T/Q/E keys for sensor/servo</li>
+              <li> Click buttons as alternative to keys</li>
             </ul>
           </div>
         </div>

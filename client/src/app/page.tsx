@@ -31,7 +31,7 @@ export default function MainPage() {
   }; 
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-yellow-200 relative">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-blue-100 relative">
       <Image
         src="/HERO-Crop-Production1.jpg"
         alt="Background Image"
@@ -39,7 +39,7 @@ export default function MainPage() {
         className="object-cover z-[-1] opacity-40"
       />
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
-        🌱 Smart Farm System Configuration
+        Smart Farm System Configuration
       </h1>
 
       <form onSubmit={handleSubmit} className="w-full max-w-lg bg-white p-6 rounded-xl shadow-lg space-y-4 z-10">
@@ -123,14 +123,14 @@ export default function MainPage() {
           type="submit"
           className="w-full bg-green-600 text-white p-3 rounded-xl hover:bg-green-700 transition duration-300 font-semibold"
         >
-          🚀 Initialize Farm System
+           Initialize Farm System
         </button>
 
         <div className="text-xs text-gray-600 mt-4">
-          <p>• Motor ESP32: Controls robot movement</p>
-          <p>• Sensor ESP32: Handles irrigation sensors (optional)</p>
-          <p>• Camera: For live monitoring and ML analysis</p>
-          <p>• ML API: For plant disease detection</p>
+          <p>Motor ESP32: Controls robot movement</p>
+          <p>Sensor ESP32: Handles irrigation sensors (optional)</p>
+          <p>Camera: For live monitoring and ML analysis</p>
+          <p>ML API: For plant disease detection</p>
         </div>
       </form>
     </div>

@@ -19,7 +19,7 @@ const int IN4 = D8;
 
 bool automaticMode = false;
 unsigned long lastAutoMove = 0;
-const unsigned long AUTO_MOVE_INTERVAL = 15000; // 15 seconds
+const unsigned long AUTO_MOVE_INTERVAL = 10000; // 15 seconds
 
 String sensorEspIP = "";
 const int SOIL_THRESHOLD = 500; // Adjust as needed
@@ -39,6 +39,7 @@ void setup() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
+  WiFi.setSleep(false);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -69,13 +70,16 @@ void loop() {
     if (millis() - lastAutoMove > AUTO_MOVE_INTERVAL) {
       lastAutoMove = millis();
 
+      // 1. Move forward for 2 seconds
       moveForward();
-      delay(2500);
+      delay(2000);
       stopMotors();
 
+      // 2. Request soil value from ESP32
       int soilValue = getSoilValueFromSensorESP();
       Serial.printf("Soil value from Sensor ESP: %d\n", soilValue);
 
+      // 3. If soil is dry, start pump for 3 seconds
       if (soilValue != -1 && soilValue < SOIL_THRESHOLD) {
         Serial.println("Soil dry, starting pump...");
         sendSensorCommand("/pump_start");
@@ -83,8 +87,9 @@ void loop() {
         sendSensorCommand("/pump_stop");
         Serial.println("Pump stopped.");
       } else {
-        Serial.println("Soil OK, moving ahead.");
+        Serial.println("Soil OK, not starting pump.");
       }
+      // 4. Wait for next cycle (handled by AUTO_MOVE_INTERVAL)
     }
   }
 }
@@ -158,7 +163,7 @@ int getSoilValueFromSensorESP() {
   WiFiClient client;
   HTTPClient http;
   String url = "http://" + sensorEspIP + "/servo_start";
-  http.begin(client, url);  // ✅ Fixed API
+  http.begin(client, url);
 
   int httpCode = http.GET();
   int soilValue = -1;
@@ -183,7 +188,7 @@ void sendSensorCommand(const String& endpoint) {
   WiFiClient client;
   HTTPClient http;
   String url = "http://" + sensorEspIP + endpoint;
-  http.begin(client, url);  // ✅ Fixed API
+  http.begin(client, url);
   http.GET();
   http.end();
 }

@@ -29,6 +29,8 @@ export default function SurveillancePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisHistory, setAnalysisHistory] = useState<PredictionResult[]>([]);
   const isKeyPressed = useRef<{ [key: string]: boolean }>({});
+  const [uploadedImage, setUploadedImage] = useState<File | null>(null);
+  const [diseaseInfo, setDiseaseInfo] = useState<any>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
   // Dynamic IP webcam URL
@@ -103,6 +105,46 @@ export default function SurveillancePage() {
       console.error("Command failed:", error);
       setIsConnected(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setUploadedImage(e.target.files[0]);
+    }
+  };
+
+  const analyzeUploadedImage = async () => {
+    if (!uploadedImage || !isMlConnected) {
+      alert("No image selected or ML API not connected");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Image = reader.result as string;
+      setIsAnalyzing(true);
+      try {
+        const response = await fetch(`${mlApiURL}/predict`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64Image })
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.status === 'success') {
+            setPredictionResult(result.prediction);
+            setDiseaseInfo(result.disease_info);
+            setAnalysisHistory(prev => [result.prediction, ...prev.slice(0, 4)]);
+          }
+        } else {
+          alert("ML API error");
+        }
+      } catch (error) {
+        alert("Analysis failed");
+      } finally {
+        setIsAnalyzing(false);
+      }
+    };
+    reader.readAsDataURL(uploadedImage);
   };
 
   function isImageBlankOrBlack(img: HTMLImageElement): boolean {
@@ -404,6 +446,68 @@ export default function SurveillancePage() {
             </button>
           </div>
 
+          <div className="w-full max-w-4xl bg-white p-4 rounded-xl shadow-lg mb-6">
+        {/* <h3 className="text-lg font-semibold mb-2 text-gray-800">Upload Image for Analysis</h3>
+        <div className="flex gap-4 items-center">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="border px-2 py-1 rounded"
+          />
+          <button
+            onClick={analyzeUploadedImage}
+            disabled={!uploadedImage || isAnalyzing || !isMlConnected}
+            className={`px-4 py-2 rounded-lg transition duration-300 ${
+              !uploadedImage || isAnalyzing || !isMlConnected
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700'
+            } text-white`}
+          >
+            {isAnalyzing ? '🔄 Analyzing...' : 'Analyze Uploaded Image'}
+          </button>
+        </div>
+        {uploadedImage && (
+          <div className="mt-2">
+            <img
+              src={URL.createObjectURL(uploadedImage)}
+              alt="Uploaded preview"
+              className="max-h-40 rounded border mt-2"
+            />
+          </div>
+        )} */}
+      </div>
+<div className="w-full max-w-4xl bg-white p-4 rounded-xl shadow-lg mb-6">
+        <h3 className="text-lg font-semibold mb-2 text-gray-800">Upload Image for Analysis</h3>
+        <div className="flex gap-4 items-center">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="border px-2 py-1 rounded"
+          />
+          <button
+            onClick={analyzeUploadedImage}
+            disabled={!uploadedImage || isAnalyzing || !isMlConnected}
+            className={`px-4 py-2 rounded-lg transition duration-300 ${
+              !uploadedImage || isAnalyzing || !isMlConnected
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700'
+            } text-white`}
+          >
+            {isAnalyzing ? '🔄 Analyzing...' : 'Analyze Uploaded Image'}
+          </button>
+        </div>
+        {uploadedImage && (
+          <div className="mt-2">
+            <img
+              src={URL.createObjectURL(uploadedImage)}
+              alt="Uploaded preview"
+              className="max-h-40 rounded border mt-2"
+            />
+          </div>
+        )}
+      </div>
           {/* Movement Controls */}
           <div className="mt-6">
             <h4 className="text-md font-semibold mb-3 text-gray-800 text-center">Movement Controls</h4>
@@ -480,6 +584,42 @@ export default function SurveillancePage() {
                   )}
                 </div>
               </div>
+                 {diseaseInfo && (
+        <div className="w-full max-w-4xl bg-white p-4 rounded-xl shadow-lg mt-6">
+          <h3 className="text-lg font-semibold mb-2 text-gray-800">Disease Information Dashboard</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <h4 className="font-semibold text-green-700 mb-1">Prevention</h4>
+              <ul className="list-disc ml-4 text-sm text-gray-700">
+                {diseaseInfo.prevention?.map((item: string, idx: number) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-700 mb-1">Treatment</h4>
+              <ul className="list-disc ml-4 text-sm text-gray-700">
+                {diseaseInfo.treatment?.map((item: string, idx: number) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-yellow-700 mb-1">Favorable Conditions</h4>
+              <ul className="list-disc ml-4 text-sm text-gray-700">
+                {diseaseInfo.favorable_conditions?.map((item: string, idx: number) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <div className="mt-4">
+            <h4 className="font-semibold text-gray-800 mb-1">Description</h4>
+            <p className="text-sm text-gray-700">{diseaseInfo.description}</p>
+            <p className="text-xs text-gray-500 mt-2"><strong>Pathogen Type:</strong> {diseaseInfo.pathogen_type}</p>
+          </div>
+        </div>
+      )}
 
               {/* Analysis History */}
               <div>
@@ -492,7 +632,8 @@ export default function SurveillancePage() {
                       <div className="flex justify-between items-center text-sm">
                         <span>{result.plant.replace(/_/g, ' ')}</span>
                         <span className={result.is_healthy ? 'text-green-600' : 'text-red-600'}>
-                          {result.is_healthy ? '✅' : '⚠️'} {(result.confidence * 100).toFixed(1)}%
+                          {result.is_healthy ? '✅' : '⚠️'} 
+                          {/* {(result.confidence * 100).toFixed(1)}% */}
                         </span>
                       </div>
                       <div className="text-xs text-gray-600">

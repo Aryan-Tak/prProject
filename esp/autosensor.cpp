@@ -5,9 +5,9 @@
 const char* ssid = "SDP";
 const char* password = "123456789";
 
-// Pins
-const int RELAY_PIN = 15; // Pump relay
-const int SOIL_PIN = 13;  // Soil sensor (G13)
+// Relay and pump pin
+const int RELAY_PIN = 15; // Relay IN connected to GPIO15
+const int SOIL_PIN = 13;
 
 WebServer server(80);
 
